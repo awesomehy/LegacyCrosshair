@@ -13,6 +13,7 @@ namespace LegacyCrosshair
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr handle, out Native.Rect rect);
         [DllImport("user32.dll")] private static extern IntPtr GetThreadDpiAwarenessContext();
         [DllImport("user32.dll")] private static extern bool AreDpiAwarenessContextsEqual(IntPtr first, IntPtr second);
+        [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
         private int smokeStep, smokeChecks;
         private IntPtr beforeOverlay;
         private int themeRasterHash;
@@ -32,7 +33,7 @@ namespace LegacyCrosshair
             smokeTimer = new System.Windows.Forms.Timer { Interval = 250 };
             smokeTimer.Tick += delegate {
                 try { SmokeNext(); }
-                catch (Exception ex) { Console.Error.WriteLine(ex); SmokeExitCode = 1; smokeTimer.Stop(); Close(); }
+                catch (Exception ex) { Console.Error.WriteLine(ex); SmokeExitCode = 1; smokeTimer.Stop(); RequestExit(); }
             };
             smokeTimer.Start();
         }
@@ -62,6 +63,16 @@ namespace LegacyCrosshair
             {
                 case 0:
                     SmokeCheck(AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(), new IntPtr(-4)), "Application uses per-monitor V2 physical-pixel awareness");
+                    using (var embeddedIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+                    using (var iconBitmap = embeddedIcon.ToBitmap())
+                    {
+                        Color center = iconBitmap.GetPixel(iconBitmap.Width / 2, iconBitmap.Height / 2);
+                        SmokeCheck(center.B > 150 && center.B > center.R * 1.5, "Executable file embeds the blue crosshair icon");
+                    }
+                    SmokeCheck(Icon == applicationIcon && tray.Icon == applicationIcon && Icon.Handle != SystemIcons.Application.Handle,
+                        "Settings window and notification area share the application icon");
+                    SmokeCheck(SendMessage(Handle, 0x007F, new IntPtr(1), IntPtr.Zero) != IntPtr.Zero && SendMessage(Handle, 0x007F, IntPtr.Zero, IntPtr.Zero) != IntPtr.Zero,
+                        "Native window exposes large and small taskbar/titlebar icons");
                     SmokeCheck(!keyboard.Registered && !holdButton.Enabled && !demoButton.Enabled && !pages[1].Content.Enabled, "Static mode disables Raw Input, dynamic settings and demonstration controls");
                     SmokeCheck(liveFrame != null && preview.Frame != null, "Live preview receives rendered frame");
                     int staticReads = keyboard.ReadCount, staticSteps = liveModel.StepCount + demoModel.StepCount;
@@ -109,6 +120,42 @@ namespace LegacyCrosshair
                     CheckTabWidth(); RenderForm("ui-display.png");
                     foreach (var control in Walk(this))
                     {
+                        var combo = control as ChoiceField;
+                        if (combo != null && combo.AccessibleName == "游戏渲染分辨率")
+                        {
+                            int fourThree = 0; bool selectedPresetsWork = true;
+                            for (int i = 1; i < combo.Items.Count; i++)
+                            {
+                                string label = combo.Items[i].ToString();
+                                if (!label.Contains("4:3")) continue;
+                                fourThree++; combo.SelectedIndex = i;
+                                string[] dimensions = label.Split('·')[0].Split('×');
+                                selectedPresetsWork &= settings.GameWidth == Int32.Parse(dimensions[0].Trim()) && settings.GameHeight == Int32.Parse(dimensions[1].Trim()) && settings.GameWidth * 3 == settings.GameHeight * 4;
+                            }
+                            SmokeCheck(fourThree == 13 && selectedPresetsWork, "All 13 labeled 4:3 presets set the matching render dimensions");
+                            for (int i = 0; i < combo.Items.Count; i++) if (combo.Items[i].ToString().Contains("1920 × 1440")) combo.SelectedIndex = i;
+                        }
+                    }
+                    SmokeCheck(settings.GameWidth == 1920 && settings.GameHeight == 1440, "1920x1440 4:3 resolution preset updates both game dimensions");
+                    demo = heldPreview = false; demoButton.Text = "自动演示"; settings.Mapping = "stretch"; RefreshUi(); Changed(); Tick(this, EventArgs.Empty);
+                    Point beforeCalibration = liveFrame.Origin; int beforeCalibrationHash = RasterHash();
+                    foreach (var control in Walk(this)) if (control is Button && control.Text.StartsWith("中心位置校准")) ((Button)control).PerformClick();
+                    foreach (var control in Walk(this))
+                    {
+                        var number = control as NumberField;
+                        if (number != null && number.AccessibleName == "水平偏移 · px") number.Value = -1;
+                        if (number != null && number.AccessibleName == "垂直偏移 · px") number.Value = 1;
+                    }
+                    Tick(this, EventArgs.Empty);
+                    SmokeCheck(settings.OffsetX == -1 && settings.OffsetY == 1 && liveFrame.Origin == new Point(beforeCalibration.X - 1, beforeCalibration.Y + 1) && beforeCalibrationHash == RasterHash(),
+                        "Center calibration controls translate the live raster by physical pixels");
+                    SmokeCheck(preview.Frame == liveFrame, "Preview and overlay share the calibrated raster");
+                    RenderForm("ui-center-calibration.png");
+                    foreach (var control in Walk(this)) if (control is Button && control.Text == "重置中心位置") ((Button)control).PerformClick();
+                    Tick(this, EventArgs.Empty);
+                    SmokeCheck(settings.OffsetX == 0 && settings.OffsetY == 0 && liveFrame.Origin == beforeCalibration, "Reset center restores the original location exactly");
+                    foreach (var control in Walk(this))
+                    {
                         var number = control as NumberField;
                         if (number != null && number.AccessibleName == "自定义宽度") number.Value = 1300;
                     }
@@ -116,7 +163,7 @@ namespace LegacyCrosshair
                     foreach (var control in Walk(this))
                     {
                         var combo = control as ChoiceField;
-                        if (combo != null && combo.Items.Count == 10) customSelected = combo.SelectedIndex == 0;
+                        if (combo != null && combo.AccessibleName == "游戏渲染分辨率") customSelected = combo.SelectedIndex == 0;
                     }
                     SmokeCheck(customSelected && settings.GameWidth == 1300, "Custom resolution synchronizes the preset selector");
                     demo = heldPreview = false; settings.Dynamic = false; settings.OnlyCs2 = true; Changed(); ToggleOverlay(); break;
@@ -229,9 +276,30 @@ namespace LegacyCrosshair
                 case 24:
                     SmokeCheck(keyboard.Registered && holdButton.Enabled && pages[1].Content.Enabled && settings.Spread == savedDynamicSpread,
                         "Switching back to dynamic restores its input and saved parameters");
+                    if (!enabled) ToggleOverlay();
+                    Tick(this, EventArgs.Empty); Close(); break;
+                case 25:
+                    SmokeCheck(!Visible && !IsDisposed && !ending && tray.Visible && overlay.Visible && keyboard.Registered,
+                        "Close button hides settings while keeping the tray, overlay and dynamic input running");
+                    ShowSettings();
+                    SmokeCheck(Visible && WindowState == FormWindowState.Normal, "Hidden settings can be restored without restarting the application");
+                    demo = heldPreview = false; settings.Dynamic = false; Changed(); Save(); Tick(this, EventArgs.Empty); Close(); break;
+                case 26:
+                    SmokeCheck(!Visible && overlay.Visible && !keyboard.Registered && !timer.Enabled,
+                        "Close to tray preserves the static overlay and idle sleep");
+                    ToolStripItem exitItem = null;
+                    foreach (ToolStripItem item in tray.ContextMenuStrip.Items) if (item.Text == "退出") exitItem = item;
+                    SmokeCheck(exitItem != null, "Tray context menu provides an explicit exit command");
+                    var shutdown = new FormClosingEventArgs(CloseReason.WindowsShutDown, false);
+                    OnFormClosing(shutdown);
+                    SmokeCheck(!shutdown.Cancel && !overlay.IsDisposed && tray.Visible,
+                        "System shutdown is allowed and native resources survive the closing notification until closed");
+                    smokeTimer.Stop(); smokeTimer.Dispose(); exitItem.PerformClick();
+                    SmokeCheck(IsDisposed && overlay.IsDisposed && ending && !tray.Visible && keyboard.Handle == IntPtr.Zero,
+                        "Tray exit closes the application and releases overlay, input and notification icon");
                     Console.WriteLine("All " + smokeChecks + " UI/native smoke checks passed.");
                     Console.WriteLine("Offscreen UI renders: " + Artifacts);
-                    smokeTimer.Stop(); smokeTimer.Dispose(); Close(); break;
+                    break;
             }
         }
         private void CheckReusableSurface()

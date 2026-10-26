@@ -19,6 +19,7 @@ namespace LegacyCrosshair
         public bool Split = true;
         public double SplitDistance = 7, SplitRatio = 0.35, InnerAlpha = 1, OuterAlpha = 0.5;
         public int GameWidth = 1280, GameHeight = 960;
+        public int OffsetX = 0, OffsetY = 0;
         public string Mapping = "stretch", Monitor = "";
         public bool Listen = true, OnlyCs2 = false, FollowCs2 = false;
         public string Background = "range";
@@ -38,6 +39,7 @@ namespace LegacyCrosshair
             InnerAlpha = Clamp(InnerAlpha, 0, 1); OuterAlpha = Clamp(OuterAlpha, 0, 1);
             if (GameWidth < 320 || GameWidth > 16384 || GameHeight < 240 || GameHeight > 16384)
                 throw new InvalidDataException("游戏分辨率须在 320×240 至 16384×16384 范围内。");
+            OffsetX = Math.Max(-100, Math.Min(100, OffsetX)); OffsetY = Math.Max(-100, Math.Min(100, OffsetY));
             if (Mapping != "stretch" && Mapping != "fit") Mapping = "stretch";
             if (Background != "range" && Background != "dark" && Background != "light" && Background != "grid") Background = "range";
             if (Monitor == null) Monitor = "";
@@ -259,7 +261,7 @@ namespace LegacyCrosshair
             Rectangle bounds = Rectangle.Empty;
             foreach (var bar in cores) bounds = bounds.IsEmpty ? bar.Rect : Rectangle.Union(bounds, bar.Rect);
             foreach (var bar in outlines) bounds = bounds.IsEmpty ? bar.Rect : Rectangle.Union(bounds, bar.Rect);
-            if (bounds.IsEmpty) bounds = new Rectangle(output.Left + output.Width / 2, output.Top + output.Height / 2, 1, 1);
+            if (bounds.IsEmpty) bounds = new Rectangle(output.Left + output.Width / 2 + settings.OffsetX, output.Top + output.Height / 2 + settings.OffsetY, 1, 1);
             bounds.Inflate(2, 2);
             if ((long)bounds.Width * bounds.Height > 16000000) throw new InvalidOperationException("准星画布过大，请减小尺寸。");
             int[] pixels = new int[bounds.Width * bounds.Height];
@@ -280,6 +282,9 @@ namespace LegacyCrosshair
             int t = Quantize(m.Viewport.Top + (cy + r.Top) * m.ScaleY);
             int rr = Quantize(m.Viewport.Left + (cx + r.Right) * m.ScaleX);
             int b = Quantize(m.Viewport.Top + (cy + r.Bottom) * m.ScaleY);
+            // Calibration is an integer translation after raster quantization. It must
+            // never be stretched with game pixels or change a bar's size or outline.
+            l += s.OffsetX; rr += s.OffsetX; t += s.OffsetY; b += s.OffsetY;
             return Rectangle.FromLTRB(l, t, Math.Max(l + 1, rr), Math.Max(t + 1, b));
         }
         private static void Fill(int[] pixels, Rectangle bounds, Bar bar, Settings s, bool outline)

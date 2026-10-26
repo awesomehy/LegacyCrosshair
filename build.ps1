@@ -8,7 +8,9 @@ $outputDirectory = Join-Path $workspaceRoot 'bin'
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $workspaceRoot 'src') -Filter '*.cs' | ForEach-Object { $_.FullName })
 $references = @('/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll')
-& $compiler /nologo /utf8output /codepage:65001 /target:winexe /platform:x64 /optimize+ "/win32manifest:$workspaceRoot\app.manifest" "/out:$outputDirectory\LegacyCrosshair.exe" $references $sources
+$icon = Join-Path $workspaceRoot 'assets\LegacyCrosshair.ico'
+$iconOptions = @("/win32icon:$icon", "/resource:$icon,LegacyCrosshair.App.ico")
+& $compiler /nologo /utf8output /codepage:65001 /target:winexe /platform:x64 /optimize+ "/win32manifest:$workspaceRoot\app.manifest" "/out:$outputDirectory\LegacyCrosshair.exe" $iconOptions $references $sources
 if ($LASTEXITCODE -ne 0) { throw 'Application compilation failed.' }
 Copy-Item -LiteralPath (Join-Path $workspaceRoot 'app.config') -Destination (Join-Path $outputDirectory 'LegacyCrosshair.exe.config') -Force
 Write-Output "Built: $outputDirectory\LegacyCrosshair.exe"
@@ -20,7 +22,7 @@ if ($Test) {
 }
 if ($SmokeTest) {
     $uiSources = @($sources | Where-Object { [System.IO.Path]::GetFileName($_) -ne 'Program.cs' })
-    & $compiler /nologo /utf8output /codepage:65001 /target:exe /define:UI_TEST /platform:x64 /optimize+ "/win32manifest:$workspaceRoot\app.manifest" "/out:$outputDirectory\LegacyCrosshair.UiTests.exe" $references $uiSources (Join-Path $workspaceRoot 'tests\UiSmokeTests.cs')
+    & $compiler /nologo /utf8output /codepage:65001 /target:exe /define:UI_TEST /platform:x64 /optimize+ "/win32manifest:$workspaceRoot\app.manifest" "/out:$outputDirectory\LegacyCrosshair.UiTests.exe" $iconOptions $references $uiSources (Join-Path $workspaceRoot 'tests\UiSmokeTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'UI smoke test compilation failed.' }
     Copy-Item -LiteralPath (Join-Path $workspaceRoot 'app.config') -Destination (Join-Path $outputDirectory 'LegacyCrosshair.UiTests.exe.config') -Force
     & (Join-Path $outputDirectory 'LegacyCrosshair.UiTests.exe')

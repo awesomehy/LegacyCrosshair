@@ -38,9 +38,16 @@ namespace LegacyCrosshair
             benchmarkTimer = new System.Windows.Forms.Timer { Interval = 100 };
             benchmarkTimer.Tick += delegate {
                 try { BenchmarkStep(); }
-                catch (Exception ex) { Console.Error.WriteLine(ex); Environment.ExitCode = 1; benchmarkTimer.Stop(); Close(); }
+                catch (Exception ex) { Console.Error.WriteLine(ex); Environment.ExitCode = 1; benchmarkTimer.Stop(); CloseBenchmark(); }
             };
             NextBenchmarkPhase(); benchmarkTimer.Start();
+        }
+        private void CloseBenchmark()
+        {
+            // Older source snapshots used Close() to exit; current versions keep it
+            // running in the tray. Preserve support for measuring either snapshot.
+            var exit = typeof(MainForm).GetMethod("RequestExit", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (exit != null) exit.Invoke(this, null); else Close();
         }
         private void NextBenchmarkPhase()
         {
@@ -51,7 +58,7 @@ namespace LegacyCrosshair
                 string path = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "artifacts", "performance-" + benchmarkLabel + ".json"));
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(path, new JavaScriptSerializer().Serialize(new { label = benchmarkLabel, logicalProcessors = Environment.ProcessorCount, measurements = measurements }));
-                Console.WriteLine("Saved: " + path); benchmarkProcess.Dispose(); benchmarkTimer.Dispose(); Close(); return;
+                Console.WriteLine("Saved: " + path); benchmarkProcess.Dispose(); benchmarkTimer.Dispose(); CloseBenchmark(); return;
             }
             settings = new Settings(); settings.Dynamic = benchmarkPhase == 1 || benchmarkPhase == 3;
             settings.FollowCs2 = settings.OnlyCs2 = false;

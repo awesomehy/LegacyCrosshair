@@ -11,7 +11,7 @@ namespace LegacyCrosshair
     {
         private Settings settings;
         private readonly List<Action> refreshers = new List<Action>();
-        private bool updating, dirty, enabled, demo, heldPreview, ending, updateQueued, runtimeReady;
+        private bool updating, dirty, enabled, demo, heldPreview, ending, updateQueued, runtimeReady, exitRequested;
         private bool? appliedDynamicMode;
         private int revision;
         private double lastEdit, lastTick, lastTarget = -1;
@@ -35,6 +35,7 @@ namespace LegacyCrosshair
         private SegmentedPicker themePicker, navigation;
         private readonly List<SettingsScroll> pages = new List<SettingsScroll>();
         private readonly NotifyIcon tray;
+        private readonly Icon applicationIcon;
         private readonly ToolTip tooltip = new ToolTip();
 
         public MainForm()
@@ -51,7 +52,12 @@ namespace LegacyCrosshair
             AutoScaleMode = AutoScaleMode.Dpi; AutoScaleDimensions = new SizeF(96, 96);
             ClientSize = new Size(1180, 840); MinimumSize = new Size(1000, 720);
             StartPosition = FormStartPosition.CenterScreen;
-            Icon = SystemIcons.Application;
+            using (Stream iconStream = typeof(MainForm).Assembly.GetManifestResourceStream("LegacyCrosshair.App.ico"))
+            {
+                if (iconStream == null) throw new InvalidOperationException("缺少应用图标资源，请重新构建完整版本。");
+                applicationIcon = new Icon(iconStream);
+            }
+            Icon = applicationIcon;
             BuildUi(); RefreshUi(); Theme.Apply(this);
             HandleCreated += delegate { UpdateChrome(); };
             keyboard = new RawKeyboardInput(settings.Dynamic && settings.Listen);
@@ -65,7 +71,7 @@ namespace LegacyCrosshair
             var menu = new ContextMenuStrip();
             menu.Items.Add("显示设置", null, delegate { ShowSettings(); });
             menu.Items.Add("开启 / 关闭准星  Ctrl+Alt+X", null, delegate { ToggleOverlay(); });
-            menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("退出", null, delegate { Close(); });
+            menu.Items.Add(new ToolStripSeparator()); menu.Items.Add("退出", null, delegate { RequestExit(); });
             tray.ContextMenuStrip = menu; tray.DoubleClick += delegate { ShowSettings(); };
             timer.Tick += Tick;
             Shown += delegate {
@@ -99,6 +105,7 @@ namespace LegacyCrosshair
         private void ToggleOverlay()
         { enabled = !enabled; overlayError = ""; overlayButton.Text = enabled ? "关闭覆盖层" : "开启覆盖层"; if (!enabled) { overlay.Hide(); overlay.ReleaseSurface(); } lastTarget = -1; RequestUpdate(); }
         private void ShowSettings() { Show(); WindowState = FormWindowState.Normal; Activate(); }
+        private void RequestExit() { exitRequested = true; Close(); }
         private void RefreshMonitors()
         {
             updating = true;
@@ -272,11 +279,22 @@ namespace LegacyCrosshair
         }
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            base.OnFormClosing(e);
+            if (e.Cancel) return;
+            if (e.CloseReason == CloseReason.UserClosing && !exitRequested)
+            {
+                e.Cancel = true;
+                if (dirty) Save();
+                Hide(); return;
+            }
             ending = true; timer.Stop(); if (dirty) Save();
+        }
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
             overlay.Dispose(); foreground.Dispose(); keyboard.Dispose(); preview.Frame = null;
             liveCache.Dispose(); demoCache.Dispose();
             tray.Visible = false; tray.ContextMenuStrip.Dispose(); tray.Dispose(); timer.Dispose(); tooltip.Dispose();
-            base.OnFormClosing(e);
+            base.OnFormClosed(e); applicationIcon.Dispose();
         }
         private sealed class MonitorItem
         {

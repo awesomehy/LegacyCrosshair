@@ -72,14 +72,27 @@ namespace LegacyCrosshair
             monitorBox = NewCombo(); monitorBox.SetBounds(0, 25, ContentWidth, 40); monitorBox.AccessibleName = "目标显示器"; monitorRow.Controls.Add(monitorBox); display.Controls.Add(monitorRow);
             monitorBox.SelectedIndexChanged += delegate { if (!updating && monitorBox.SelectedItem is MonitorItem) { settings.Monitor = ((MonitorItem)monitorBox.SelectedItem).Screen.DeviceName; Changed(); } };
             var resRow = Row(76); resRow.Controls.Add(Theme.Label("游戏渲染分辨率", 9, Theme.Muted)); var resolution = NewCombo(); resolution.AccessibleName = "游戏渲染分辨率";
-            resolution.SetBounds(0, 25, ContentWidth, 40); resolution.Items.AddRange(new object[] { "自定义分辨率", "1024 × 768  ·  4:3", "1280 × 960  ·  4:3", "1440 × 1080  ·  4:3", "1280 × 1024  ·  5:4", "1280 × 720  ·  16:9", "1600 × 900  ·  16:9", "1920 × 1080  ·  16:9", "2560 × 1440  ·  16:9", "3840 × 2160  ·  16:9" });
-            int[,] resolutions = { {0,0}, {1024,768}, {1280,960}, {1440,1080}, {1280,1024}, {1280,720}, {1600,900}, {1920,1080}, {2560,1440}, {3840,2160} };
+            resolution.SetBounds(0, 25, ContentWidth, 40); resolution.Items.Add("自定义分辨率");
+            int[,] resolutions = { {0,0}, {640,480}, {800,600}, {960,720}, {1024,768}, {1152,864}, {1280,960}, {1400,1050}, {1440,1080},
+                {1600,1200}, {1920,1440}, {2048,1536}, {2560,1920}, {2880,2160}, {1280,1024}, {1280,720}, {1600,900}, {1920,1080}, {2560,1440}, {3840,2160} };
+            for (int i = 1; i < resolutions.GetLength(0); i++)
+            {
+                int w = resolutions[i, 0], h = resolutions[i, 1];
+                string aspect = w * 3 == h * 4 ? "4:3" : w * 4 == h * 5 ? "5:4" : "16:9";
+                resolution.Items.Add(w + " × " + h + "  ·  " + aspect);
+            }
             resolution.SelectedIndexChanged += delegate { if (updating || resolution.SelectedIndex <= 0) return; settings.GameWidth = resolutions[resolution.SelectedIndex, 0]; settings.GameHeight = resolutions[resolution.SelectedIndex, 1]; RefreshUi(); Changed(); };
             refreshers.Add(delegate { int found = 0; for (int i = 1; i < resolutions.GetLength(0); i++) if (settings.GameWidth == resolutions[i, 0] && settings.GameHeight == resolutions[i, 1]) found = i; resolution.SelectedIndex = found; });
             resRow.Controls.Add(resolution); display.Controls.Add(resRow);
             AddNumber(display, "自定义宽度", delegate { return settings.GameWidth; }, delegate(double v) { settings.GameWidth = (int)v; RefreshUi(); }, 320, 16384, 0, 1, false);
             AddNumber(display, "自定义高度", delegate { return settings.GameHeight; }, delegate(double v) { settings.GameHeight = (int)v; RefreshUi(); }, 240, 16384, 0, 1, false);
             AddChoice(display, "画面缩放", new[] { "铺满屏幕 / 4:3 拉伸", "保持比例 / 黑边" }, delegate { return settings.Mapping == "fit" ? 1 : 0; }, delegate(int n) { settings.Mapping = n == 1 ? "fit" : "stretch"; });
+            var calibration = AddDisclosure(display, "中心位置校准");
+            AddNumber(calibration, "水平偏移 · px", delegate { return settings.OffsetX; }, delegate(double v) { settings.OffsetX = (int)v; }, -100, 100, 0, 1, false);
+            AddNumber(calibration, "垂直偏移 · px", delegate { return settings.OffsetY; }, delegate(double v) { settings.OffsetY = (int)v; }, -100, 100, 0, 1, false);
+            AddNote(calibration, "显示器物理像素：正值向右 / 下，负值向左 / 上。", 46);
+            var resetRow = Row(44); var resetCenter = Theme.Button("重置中心位置", false); resetCenter.SetBounds(0, 0, ContentWidth, 36);
+            resetCenter.Click += delegate { settings.OffsetX = settings.OffsetY = 0; RefreshUi(); Changed(); }; resetRow.Controls.Add(resetCenter); calibration.Controls.Add(resetRow);
             AddCheck(display, "对齐 CS2 窗口", delegate { return settings.FollowCs2; }, delegate(bool v) { settings.FollowCs2 = v; });
             AddCheck(display, "仅在 CS2 前台显示", delegate { return settings.OnlyCs2; }, delegate(bool v) { settings.OnlyCs2 = v; });
             AddNote(display, "游戏分辨率与画面缩放，请保持和游戏设置一致。", 48);
@@ -110,7 +123,7 @@ namespace LegacyCrosshair
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 176));
             footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.Controls.Add(footer, 0, 2);
             status = Theme.Label("正在初始化…", 10, Theme.Text); status.AutoSize = false; status.Dock = DockStyle.Fill; status.AutoEllipsis = true; footer.Controls.Add(status, 0, 0);
-            var hint = Theme.Label("Ctrl+Alt+X  切换准星     Ctrl+Alt+S  显示设置     ·     v1.0.0", 8.5f, Theme.Muted); hint.Dock = DockStyle.Fill; footer.Controls.Add(hint, 0, 1);
+            var hint = Theme.Label("Ctrl+Alt+X  切换准星     Ctrl+Alt+S  显示设置     ·     关闭后留在托盘     ·     v1.0.1", 8.5f, Theme.Muted); hint.Dock = DockStyle.Fill; footer.Controls.Add(hint, 0, 1);
             overlayButton = Theme.Button("开启覆盖层", true); overlayButton.Dock = DockStyle.Fill; overlayButton.Margin = new Padding(0, 0, 0, 8);
             overlayButton.Click += delegate { ToggleOverlay(); }; footer.Controls.Add(overlayButton, 1, 0); footer.SetRowSpan(overlayButton, 2);
         }

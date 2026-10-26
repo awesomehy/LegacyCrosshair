@@ -27,6 +27,7 @@ internal static class CoreTests
             s.Length = 0; s.Dot = true; Check(CrosshairRenderer.GameBars(s, 0).Count == 1, "Zero-length dot-only crosshair");
             s.TStyle = false; s.Dot = false; s.Length = 2; s.Gap = -2;
             CheckOutlineRegression();
+            CheckCenterCalibration();
             var stretch = ViewMapping.Create(s, new Rectangle(0, 0, 1920, 1080));
             Check(Near(stretch.ScaleX, 1.5, 0.001) && Near(stretch.ScaleY, 1.125, 0.001), "4:3 stretch scales axes independently");
             s.Mapping = "fit"; var fit = ViewMapping.Create(s, new Rectangle(0, 0, 1920, 1080));
@@ -84,10 +85,12 @@ internal static class CoreTests
                 Check(read.GameHeight == s.GameHeight && read.Gap == s.Gap, "Configuration JSON round trip");
                 s.Gap = -3; ConfigStore.Write(path, s);
                 Check(File.Exists(path + ".bak") && ConfigStore.Read(path).Gap == -3, "Atomic configuration update retains backup");
-                s.UiTheme = "dark"; ConfigStore.Write(path, s);
+                s.UiTheme = "dark"; s.OffsetX = -1; s.OffsetY = 2; ConfigStore.Write(path, s);
                 Check(ConfigStore.Read(path).UiTheme == "dark", "Theme preference survives configuration round trip");
+                Check(ConfigStore.Read(path).OffsetX == -1 && ConfigStore.Read(path).OffsetY == 2, "Physical-pixel center calibration survives configuration round trip");
                 File.WriteAllText(path, "{\"Version\":1,\"Length\":1.6}");
                 Check(ConfigStore.Read(path).UiTheme == "light" && ConfigStore.Read(path).Length == 1.6, "Old configuration without a theme keeps crosshair parameters and defaults to light");
+                Check(ConfigStore.Read(path).OffsetX == 0 && ConfigStore.Read(path).OffsetY == 0, "Existing configurations keep zero center calibration");
                 File.WriteAllText(path, "{broken");
                 bool rejected = false; try { ConfigStore.Read(path); } catch { rejected = true; }
                 Check(rejected, "Malformed import is rejected");
@@ -106,6 +109,39 @@ internal static class CoreTests
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
     private static void CheckPixel(bool ok) { if (!ok) throw new Exception("Overlap increased opacity"); }
+    private static void CheckCenterCalibration()
+    {
+        var s = new Settings { GameWidth = 1920, GameHeight = 1440, Length = 1.6, Thickness = 0.4, Gap = -1.1 };
+        Rectangle output = new Rectangle(0, 0, 2560, 1440);
+        ViewMapping mapping = ViewMapping.Create(s, output);
+        Check(Near(mapping.ScaleX, 4.0 / 3, 0.00001) && mapping.ScaleY == 1 && mapping.Viewport == new RectangleF(0, 0, 2560, 1440),
+            "1920x1440 to 2560x1440 stretches X by 4/3 and preserves Y");
+        for (int scenario = 0; scenario < 4; scenario++)
+        {
+            if (scenario == 1) { s.Dynamic = true; s.SplitDistance = 2; s.Length = 4; s.Alpha = 128; }
+            if (scenario == 2) { s.Mapping = "fit"; output = new Rectangle(-2560, -37, 2560, 1440); }
+            if (scenario == 3) { s.Mapping = "stretch"; output = new Rectangle(101, 37, 1919, 1079); }
+            s.OffsetX = s.OffsetY = 0;
+            using (CrosshairFrame baseline = CrosshairRenderer.Render(s, 10, output))
+            {
+                s.OffsetX = -1; s.OffsetY = 2;
+                using (CrosshairFrame shifted = CrosshairRenderer.Render(s, 10, output))
+                {
+                    bool same = shifted.Origin == new Point(baseline.Origin.X - 1, baseline.Origin.Y + 2) && shifted.Bitmap.Size == baseline.Bitmap.Size && shifted.Cores.Count == baseline.Cores.Count;
+                    for (int i = 0; i < baseline.Cores.Count; i++)
+                    {
+                        Rectangle expected = baseline.Cores[i].Rect; expected.Offset(-1, 2);
+                        same &= shifted.Cores[i].Rect == expected && shifted.Cores[i].Alpha == baseline.Cores[i].Alpha;
+                    }
+                    for (int y = 0; y < baseline.Bitmap.Height; y++) for (int x = 0; x < baseline.Bitmap.Width; x++)
+                        same &= baseline.Bitmap.GetPixel(x, y) == shifted.Bitmap.GetPixel(x, y);
+                    Check(same, "Center calibration translates all pixels without scaling or geometry changes: " + scenario);
+                }
+            }
+        }
+        s.OffsetX = Int32.MinValue; s.OffsetY = Int32.MaxValue; s.Validate();
+        Check(s.OffsetX == -100 && s.OffsetY == 100, "Center calibration bounds reject excessive imported offsets");
+    }
     private static void CheckFrameCache()
     {
         var s = new Settings { Dynamic = true, SplitDistance = 2, Alpha = 128 };
