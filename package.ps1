@@ -1,4 +1,4 @@
-param([string]$Version = '1.0.1')
+param([string]$Version = '1.0.2')
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a semantic version such as 0.1.0.' }
 & (Join-Path $PSScriptRoot 'build.ps1')
@@ -12,7 +12,6 @@ foreach ($file in @('README.md', 'REFERENCES.md', 'CHANGELOG.md')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $releaseDirectory $file) -Force
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'presets') -Destination $releaseDirectory -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'assets\LegacyCrosshair.ico') -Destination $releaseDirectory -Force
 $archivePath = Join-Path $PSScriptRoot "dist\$releaseName.zip"
 Compress-Archive -LiteralPath $releaseDirectory -DestinationPath $archivePath -CompressionLevel Optimal -Force
 $hash = Get-FileHash -LiteralPath $archivePath -Algorithm SHA256

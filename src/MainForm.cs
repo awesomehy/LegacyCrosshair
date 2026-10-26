@@ -52,11 +52,8 @@ namespace LegacyCrosshair
             AutoScaleMode = AutoScaleMode.Dpi; AutoScaleDimensions = new SizeF(96, 96);
             ClientSize = new Size(1180, 840); MinimumSize = new Size(1000, 720);
             StartPosition = FormStartPosition.CenterScreen;
-            using (Stream iconStream = typeof(MainForm).Assembly.GetManifestResourceStream("LegacyCrosshair.App.ico"))
-            {
-                if (iconStream == null) throw new InvalidOperationException("缺少应用图标资源，请重新构建完整版本。");
-                applicationIcon = new Icon(iconStream);
-            }
+            applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (applicationIcon == null) throw new InvalidOperationException("缺少应用图标资源，请重新构建完整版本。");
             Icon = applicationIcon;
             BuildUi(); RefreshUi(); Theme.Apply(this);
             HandleCreated += delegate { UpdateChrome(); };

@@ -9,7 +9,7 @@ New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $workspaceRoot 'src') -Filter '*.cs' | ForEach-Object { $_.FullName })
 $references = @('/r:System.dll','/r:System.Core.dll','/r:System.Drawing.dll','/r:System.Windows.Forms.dll','/r:System.Web.Extensions.dll')
 $icon = Join-Path $workspaceRoot 'assets\LegacyCrosshair.ico'
-$iconOptions = @("/win32icon:$icon", "/resource:$icon,LegacyCrosshair.App.ico")
+$iconOptions = @("/win32icon:$icon")
 & $compiler /nologo /utf8output /codepage:65001 /target:winexe /platform:x64 /optimize+ "/win32manifest:$workspaceRoot\app.manifest" "/out:$outputDirectory\LegacyCrosshair.exe" $iconOptions $references $sources
 if ($LASTEXITCODE -ne 0) { throw 'Application compilation failed.' }
 Copy-Item -LiteralPath (Join-Path $workspaceRoot 'app.config') -Destination (Join-Path $outputDirectory 'LegacyCrosshair.exe.config') -Force

@@ -63,6 +63,8 @@ namespace LegacyCrosshair
             {
                 case 0:
                     SmokeCheck(AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(), new IntPtr(-4)), "Application uses per-monitor V2 physical-pixel awareness");
+                    SmokeCheck(Array.IndexOf(typeof(MainForm).Assembly.GetManifestResourceNames(), "LegacyCrosshair.App.ico") < 0,
+                        "Executable reuses its native icon without embedding a second managed copy");
                     using (var embeddedIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
                     using (var iconBitmap = embeddedIcon.ToBitmap())
                     {

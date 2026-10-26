@@ -123,7 +123,7 @@ namespace LegacyCrosshair
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 176));
             footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.Controls.Add(footer, 0, 2);
             status = Theme.Label("正在初始化…", 10, Theme.Text); status.AutoSize = false; status.Dock = DockStyle.Fill; status.AutoEllipsis = true; footer.Controls.Add(status, 0, 0);
-            var hint = Theme.Label("Ctrl+Alt+X  切换准星     Ctrl+Alt+S  显示设置     ·     关闭后留在托盘     ·     v1.0.1", 8.5f, Theme.Muted); hint.Dock = DockStyle.Fill; footer.Controls.Add(hint, 0, 1);
+            var hint = Theme.Label("Ctrl+Alt+X  切换准星     Ctrl+Alt+S  显示设置     ·     关闭后留在托盘     ·     v1.0.2", 8.5f, Theme.Muted); hint.Dock = DockStyle.Fill; footer.Controls.Add(hint, 0, 1);
             overlayButton = Theme.Button("开启覆盖层", true); overlayButton.Dock = DockStyle.Fill; overlayButton.Margin = new Padding(0, 0, 0, 8);
             overlayButton.Click += delegate { ToggleOverlay(); }; footer.Controls.Add(overlayButton, 1, 0); footer.SetRowSpan(overlayButton, 2);
         }
