@@ -1,0 +1,16 @@
+{
+  "Version": 1,
+  "Dynamic": false,
+  "Length": 2.5,
+  "Thickness": 0.5,
+  "Gap": -2,
+  "Outline": 1,
+  "DrawOutline": true,
+  "Red": 95,
+  "Green": 255,
+  "Blue": 139,
+  "Alpha": 255,
+  "GameWidth": 1280,
+  "GameHeight": 960,
+  "Mapping": "stretch"
+}
