@@ -14,11 +14,17 @@ Legacy Crosshair 使用独立覆盖层，以目标显示器或游戏窗口客户
 - **适配 4:3 拉伸**：分别计算横纵轴映射，支持 1920×1440 → 2560×1440 等组合，并保持每根线条两侧的描边等宽。
 - **恢复熟悉的旧版体验**：提供经典静态和按 WASD 模拟的动态准星，自由调整长度、粗细、间距和描边，修改后立即预览。
 
-下图为作者提供的游戏实拍参考，展示游戏内准星局部与狙击镜中心线对照；上述中心对齐结论来自这组配置下的实测。
+下图为作者提供的游戏实拍参考；上述中心对齐结论来自这组配置下的实测。**黄色为游戏原生准星，白色为 Legacy Crosshair 工具准星，黑色长线为狙击镜中心线。**
 
-| 游戏内准星局部 | 狙击镜中心线对照 |
-| --- | --- |
-| ![游戏内准星局部实拍](assets/screenshots/cs2-crosshair-closeup.png) | ![准星与狙击镜中心线对照实拍](assets/screenshots/scope-center-reference.png) |
+第一张：黄色原生准星与白色工具准星的中心存在偏移。
+
+![原生准星偏移对比：黄色为游戏原生准星，白色为工具准星，右侧为 16 倍局部放大](assets/screenshots/cs2-crosshair-annotated.png)
+
+第二张：白色工具准星与黑色狙击镜中心线对齐。
+
+![工具准星对齐对比：白色为工具准星，黑色长线为狙击镜中心线，右侧为 12 倍局部放大](assets/screenshots/scope-alignment-annotated.png)
+
+标注由程序绘制在截图外，原始画面和局部均采用整数倍最近邻放大，逐像素核验未改变原图中的准星像素。查看原图：[准星局部](assets/screenshots/cs2-crosshair-closeup.png) · [狙击镜中心线对照](assets/screenshots/scope-center-reference.png)。
 
 ## 当前版本
 
@@ -132,6 +138,7 @@ CPU 时间为该进程在整个采样段累计消耗的处理器时间，0 ms �
 .\tests\MeasurePerformance.ps1 -Label current  # 四种场景，每种采样 10 秒
 .\package.ps1                 # 构建并生成 dist 下的便携 ZIP
 .\tools\Generate-Icon.ps1     # 重新生成 ICO 多尺寸图标和 PNG 预览
+.\tools\Annotate-Screenshots.ps1 # 生成 README 对比标注图并核验原始像素
 ```
 
 无需 NuGet、Node.js 或 dotnet SDK。使用 Windows .NET Framework 自带的 `csc.exe`，源码兼容 C# 5。发布包须同时包含 EXE 与 `.exe.config`，后者启用每显示器 V2 DPI 适配。
